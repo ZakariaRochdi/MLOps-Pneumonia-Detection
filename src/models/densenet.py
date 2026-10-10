@@ -25,9 +25,6 @@ class DenseNet121(nn.Module):
                 p.requires_grad = False
 
         in_features = self.backbone.classifier.in_features
-
-        # ALWAYS use Sequential so state_dict keys are stable
-        # (classifier.1.weight/bias, with classifier.0 = Dropout)
         self.backbone.classifier = nn.Sequential(
             nn.Dropout(p=dropout),
             nn.Linear(in_features, num_classes),
@@ -52,10 +49,19 @@ class DenseNet121(nn.Module):
             return F.softmax(logits, dim=1)
 
     def get_num_parameters(self, trainable_only: bool = False) -> int:
-        """Count model parameters (optionally only trainable ones)."""
         if trainable_only:
             return sum(p.numel() for p in self.parameters() if p.requires_grad)
         return sum(p.numel() for p in self.parameters())
+
+    def freeze_backbone_layers(self) -> None:
+        """Freeze backbone features (transfer learning)."""
+        for p in self.backbone.features.parameters():
+            p.requires_grad = False
+
+    def unfreeze_backbone(self) -> None:
+        """Unfreeze backbone features."""
+        for p in self.backbone.features.parameters():
+            p.requires_grad = True
 
     def get_gradcam(self, x, target_layer=None):
         """Grad-CAM via forward hook + autograd.grad (robuste)."""
