@@ -1,3 +1,12 @@
+import os
+import matplotlib
+import numpy as np
+import gradio as gr
+from matplotlib import cm
+from PIL import Image
+from src.data.dataset import CLASS_NAMES
+from src.inference.predict import PneumoniaPredictor
+
 """
 Gradio Application — Interactive web UI for Pneumonia detection.
 
@@ -10,18 +19,7 @@ Features:
   - Mobile-friendly interface
 """
 
-import os
-
-import matplotlib
-import numpy as np
-
 matplotlib.use("Agg")
-import gradio as gr
-from matplotlib import cm
-from PIL import Image
-
-from src.data.dataset import CLASS_NAMES
-from src.inference.predict import PneumoniaPredictor
 
 # ── Global predictor ─────────────────────────────────────────────────────────
 MODEL_PATH = os.environ.get("MODEL_PATH", "models/best_model.pth")
@@ -120,8 +118,9 @@ def create_gradcam_overlay(
 
     return (overlay * 255).astype(np.uint8)
 
-
 # ── Gradio Interface ─────────────────────────────────────────────────────────
+
+
 def build_interface():
     """Build and return the Gradio interface."""
 

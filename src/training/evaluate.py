@@ -9,17 +9,10 @@ Computes:
   - Outputs metrics as JSON for DVC tracking
 """
 
-import json
-import os
-import sys
-
-import matplotlib
-import numpy as np
-import torch
-
-matplotlib.use("Agg")  # Non-interactive backend for CI/CD
-import matplotlib.pyplot as plt
-import seaborn as sns
+from src.training.config import load_config
+from src.models.utils import load_model
+from src.data.dataset import CLASS_NAMES, get_dataloaders
+from tqdm import tqdm
 from sklearn.metrics import (
     accuracy_score,
     auc,
@@ -30,11 +23,17 @@ from sklearn.metrics import (
     recall_score,
     roc_curve,
 )
-from tqdm import tqdm
+import seaborn as sns
+import matplotlib.pyplot as plt
+import json
+import os
+import sys
 
-from src.data.dataset import CLASS_NAMES, get_dataloaders
-from src.models.utils import load_model
-from src.training.config import load_config
+import matplotlib
+import numpy as np
+import torch
+
+matplotlib.use("Agg")  # Non-interactive backend for CI/CD
 
 
 @torch.no_grad()
@@ -277,10 +276,16 @@ def run_evaluation(config=None):
     f1_pass = metrics["f1_weighted"] >= config.validation.f1_threshold
     acc_pass = metrics["accuracy"] >= config.validation.accuracy_threshold
     print(
-        f"  F1 ≥ {config.validation.f1_threshold}:       {'✓ PASS' if f1_pass else '✗ FAIL'} ({metrics['f1_weighted']:.4f})"
+        f"  F1 ≥ {
+            config.validation.f1_threshold}:       {
+            '✓ PASS' if f1_pass else '✗ FAIL'} ({
+            metrics['f1_weighted']:.4f})"
     )
     print(
-        f"  Accuracy ≥ {config.validation.accuracy_threshold}:  {'✓ PASS' if acc_pass else '✗ FAIL'} ({metrics['accuracy']:.4f})"
+        f"  Accuracy ≥ {
+            config.validation.accuracy_threshold}:  {
+            '✓ PASS' if acc_pass else '✗ FAIL'} ({
+            metrics['accuracy']:.4f})"
     )
 
     print(f"\n{'=' * 60}")

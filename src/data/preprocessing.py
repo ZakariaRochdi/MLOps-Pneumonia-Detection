@@ -1,3 +1,4 @@
+import torch
 """
 Preprocessing — Image transformation pipelines for training and inference.
 
@@ -103,4 +104,3 @@ def denormalize(tensor):
 
 # Needed for denormalize — imported here to avoid top-level import overhead
 # when only transforms are needed
-import torch
