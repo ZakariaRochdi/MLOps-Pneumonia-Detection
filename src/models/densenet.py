@@ -9,13 +9,33 @@ from torchvision import models
 class DenseNet121(nn.Module):
     """DenseNet121 wrapper for binary pneumonia classification."""
 
-    def __init__(self, num_classes: int = 2, pretrained: bool = True):
+    def __init__(
+        self,
+        num_classes: int = 2,
+        pretrained: bool = True,
+        dropout: float = 0.0,
+        freeze_backbone: bool = False,
+    ):
         super().__init__()
         weights = models.DenseNet121_Weights.DEFAULT if pretrained else None
         self.backbone = models.densenet121(weights=weights)
+
+        if freeze_backbone:
+            for p in self.backbone.features.parameters():
+                p.requires_grad = False
+
         in_features = self.backbone.classifier.in_features
-        self.backbone.classifier = nn.Linear(in_features, num_classes)
+        if dropout and dropout > 0:
+            self.backbone.classifier = nn.Sequential(
+                nn.Dropout(p=dropout),
+                nn.Linear(in_features, num_classes),
+            )
+        else:
+            self.backbone.classifier = nn.Linear(in_features, num_classes)
+
         self.num_classes = num_classes
+        self.dropout = dropout
+        self.freeze_backbone = freeze_backbone
 
     def forward(self, x):
         if self.training and x.size(0) == 1:
@@ -87,6 +107,16 @@ class DenseNet121(nn.Module):
 DenseNet121Classifier = DenseNet121
 
 
-def build_densenet121(num_classes: int = 2, pretrained: bool = True) -> DenseNet121:
+def build_densenet121(
+    num_classes: int = 2,
+    pretrained: bool = True,
+    dropout: float = 0.0,
+    freeze_backbone: bool = False,
+) -> DenseNet121:
     """Factory function."""
-    return DenseNet121(num_classes=num_classes, pretrained=pretrained)
+    return DenseNet121(
+        num_classes=num_classes,
+        pretrained=pretrained,
+        dropout=dropout,
+        freeze_backbone=freeze_backbone,
+    )
