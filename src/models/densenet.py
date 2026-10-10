@@ -25,13 +25,13 @@ class DenseNet121(nn.Module):
                 p.requires_grad = False
 
         in_features = self.backbone.classifier.in_features
-        if dropout and dropout > 0:
-            self.backbone.classifier = nn.Sequential(
-                nn.Dropout(p=dropout),
-                nn.Linear(in_features, num_classes),
-            )
-        else:
-            self.backbone.classifier = nn.Linear(in_features, num_classes)
+
+        # ALWAYS use Sequential so state_dict keys are stable
+        # (classifier.1.weight/bias, with classifier.0 = Dropout)
+        self.backbone.classifier = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(in_features, num_classes),
+        )
 
         self.num_classes = num_classes
         self.dropout = dropout
@@ -50,6 +50,12 @@ class DenseNet121(nn.Module):
         with torch.no_grad():
             logits = self.forward(x)
             return F.softmax(logits, dim=1)
+
+    def get_num_parameters(self, trainable_only: bool = False) -> int:
+        """Count model parameters (optionally only trainable ones)."""
+        if trainable_only:
+            return sum(p.numel() for p in self.parameters() if p.requires_grad)
+        return sum(p.numel() for p in self.parameters())
 
     def get_gradcam(self, x, target_layer=None):
         """Grad-CAM via forward hook + autograd.grad (robuste)."""
