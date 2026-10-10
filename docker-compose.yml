@@ -1,0 +1,82 @@
+# ==============================================================================
+# Docker Compose — Multi-container setup for the MLOps pipeline
+#
+# Services:
+#   api       — FastAPI inference REST API (port 8000)
+#   gradio    — Gradio interactive web UI (port 7860)
+#   mlflow    — MLflow experiment tracking server (port 5000)
+# ==============================================================================
+
+version: "3.9"
+
+services:
+  # ── FastAPI Inference API ──────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chest-xray-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=models/best_model.pth
+      - MODEL_VERSION=1.0.0
+    volumes:
+      - ./models:/app/models:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - mlops-network
+
+  # ── Gradio Web UI ─────────────────────────────────────────────────────────
+  gradio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chest-xray-gradio
+    ports:
+      - "7860:7860"
+    environment:
+      - MODEL_PATH=models/best_model.pth
+    volumes:
+      - ./models:/app/models:ro
+    command: ["python", "-m", "api.app_gradio"]
+    restart: unless-stopped
+    networks:
+      - mlops-network
+
+  # ── MLflow Tracking Server ────────────────────────────────────────────────
+  mlflow:
+    image: python:3.10-slim
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    command: >
+      bash -c "
+        pip install mlflow &&
+        mlflow server
+          --host 0.0.0.0
+          --port 5000
+          --backend-store-uri sqlite:///mlflow/mlflow.db
+          --default-artifact-root /mlflow/artifacts
+      "
+    restart: unless-stopped
+    networks:
+      - mlops-network
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  mlflow-data:
+    driver: local
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  mlops-network:
+    driver: bridge

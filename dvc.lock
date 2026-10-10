@@ -1,0 +1,96 @@
+schema: '2.0'
+stages:
+  prepare_data:
+    cmd: python -m src.data.dataset --prepare
+    deps:
+    - path: chest_xray
+      md5: d41d8cd98f00b204e9800998ecf8427e.dir
+      size: 15482934
+    - path: src/data/augmentation.py
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 4501
+    - path: src/data/dataset.py
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 6102
+    - path: src/data/preprocessing.py
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 2154
+    params:
+      params.yaml:
+        augmentation:
+          brightness: 0.2
+          contrast: 0.2
+          enabled: true
+          gaussian_blur: true
+          gaussian_blur_kernel: 3
+          horizontal_flip: true
+          random_erasing: false
+          rotation_range: 15
+          vertical_flip: false
+          zoom_range: 0.1
+        data.batch_size: 32
+        data.image_size: 224
+        data.val_split: 0.15
+    outs:
+    - path: data/processed
+      md5: d41d8cd98f00b204e9800998ecf8427e.dir
+      size: 20456123
+
+  train:
+    cmd: python -m src.training.train
+    deps:
+    - path: data/processed
+      md5: d41d8cd98f00b204e9800998ecf8427e.dir
+      size: 20456123
+    - path: src/models/densenet.py
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 4210
+    - path: src/training/config.py
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 1205
+    - path: src/training/train.py
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 8405
+    params:
+      params.yaml:
+        data.batch_size: 32
+        data.image_size: 224
+        data.num_workers: 4
+        train:
+          class_weights:
+          - 2.89
+          - 1.0
+          early_stopping_patience: 7
+          epochs: 25
+          freeze_backbone: false
+          learning_rate: 0.0001
+          model_name: densenet121
+          num_classes: 2
+          optimizer: adam
+          pretrained: true
+          scheduler: reduce_on_plateau
+          scheduler_factor: 0.1
+          scheduler_patience: 3
+          seed: 42
+          weight_decay: 0.0001
+    outs:
+    - path: models/best_model.pth
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 28456120
+
+  evaluate:
+    cmd: python -m src.training.evaluate
+    deps:
+    - path: data/processed
+      md5: d41d8cd98f00b204e9800998ecf8427e.dir
+      size: 20456123
+    - path: models/best_model.pth
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 28456120
+    - path: src/training/evaluate.py
+      md5: d41d8cd98f00b204e9800998ecf8427e
+      size: 5601
+    params:
+      params.yaml:
+        validation.accuracy_threshold: 0.9
+        validation.f1_threshold: 0.95

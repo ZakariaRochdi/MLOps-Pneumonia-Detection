@@ -1,0 +1,138 @@
+# ==============================================================================
+# GitLab CI/CD Pipeline — Chest X-ray Pneumonia Detection
+# Alternative CI/CD configuration for GitLab-hosted repositories
+# ==============================================================================
+
+stages:
+  - test
+  - validate
+  - build
+  - deploy_staging
+  - deploy_production
+
+variables:
+  PYTHON_VERSION: "3.10"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  DOCKER_IMAGE: "$CI_REGISTRY_IMAGE/chest-xray-api"
+
+# Cache pip downloads between jobs
+cache:
+  paths:
+    - .cache/pip/
+    - venv/
+
+# ==============================================================================
+# Stage 1: Lint & Unit Tests
+# ==============================================================================
+
+lint:
+  stage: test
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pip install flake8
+    - flake8 src/ api/ tests/ --max-line-length=120 --statistics
+  allow_failure: true
+
+unit_tests:
+  stage: test
+  image: python:${PYTHON_VERSION}-slim
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends libgl1-mesa-glx libglib2.0-0
+    - pip install -r requirements.txt
+  script:
+    - pytest tests/test_preprocessing.py -v --tb=short --junitxml=report_preprocessing.xml
+    - pytest tests/test_model.py -v --tb=short --junitxml=report_model.xml
+    - pytest tests/test_inference.py -v --tb=short --junitxml=report_inference.xml
+  artifacts:
+    reports:
+      junit:
+        - report_*.xml
+    when: always
+
+# ==============================================================================
+# Stage 2: Model Validation Gate
+# ==============================================================================
+
+model_validation:
+  stage: validate
+  image: python:${PYTHON_VERSION}-slim
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends libgl1-mesa-glx libglib2.0-0
+    - pip install -r requirements.txt
+    - pip install dvc dvc-s3
+  script:
+    # Pull model and data with DVC
+    - dvc pull
+    # Run evaluation
+    - python -m src.training.evaluate
+    # Validate performance thresholds
+    - pytest tests/test_validation.py -v --tb=long --junitxml=report_validation.xml
+  artifacts:
+    reports:
+      junit: report_validation.xml
+    paths:
+      - reports/eval_metrics.json
+      - reports/confusion_matrix.png
+      - reports/roc_curve.png
+    when: always
+  only:
+    - main
+    - develop
+
+# ==============================================================================
+# Stage 3: Build Docker Image
+# ==============================================================================
+
+build_docker:
+  stage: build
+  image: docker:24.0
+  services:
+    - docker:24.0-dind
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    # Pull model artifact
+    - apk add --no-cache python3 py3-pip
+    - pip3 install dvc dvc-s3
+    - dvc pull models/best_model.pth
+    # Build and push
+    - docker build -t "$DOCKER_IMAGE:$CI_COMMIT_SHA" -t "$DOCKER_IMAGE:latest" .
+    - docker push "$DOCKER_IMAGE:$CI_COMMIT_SHA"
+    - docker push "$DOCKER_IMAGE:latest"
+  only:
+    - main
+
+# ==============================================================================
+# Stage 4: Deploy to Staging
+# ==============================================================================
+
+deploy_staging:
+  stage: deploy_staging
+  image: alpine:latest
+  environment:
+    name: staging
+    url: https://staging.example.com
+  script:
+    - echo "Deploying $DOCKER_IMAGE:$CI_COMMIT_SHA to staging..."
+    # Replace with actual deployment commands:
+    # - kubectl set image deployment/chest-xray-api api=$DOCKER_IMAGE:$CI_COMMIT_SHA
+    # - curl -f https://staging.example.com/health
+  only:
+    - main
+
+# ==============================================================================
+# Stage 5: Deploy to Production (manual trigger)
+# ==============================================================================
+
+deploy_production:
+  stage: deploy_production
+  image: alpine:latest
+  environment:
+    name: production
+    url: https://api.example.com
+  script:
+    - echo "Deploying $DOCKER_IMAGE:$CI_COMMIT_SHA to production..."
+    # Replace with actual deployment commands
+  when: manual  # Requires manual click in GitLab UI
+  only:
+    - main

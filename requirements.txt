@@ -1,0 +1,48 @@
+# ==============================================================================
+# MLOps Chest X-ray Pneumonia Detection — Dependencies
+# ==============================================================================
+
+# Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Data & ML
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+Pillow>=10.0.0
+
+# Experiment Tracking & Model Registry
+mlflow>=2.8.0
+wandb>=0.16.0
+
+# API & Serving
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+gradio>=4.0.0
+python-multipart>=0.0.6
+
+# Data Versioning
+dvc>=3.30.0
+dvc-s3>=3.0.0
+# dvc-gs>=3.0.0  # Uncomment for Google Cloud Storage
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+httpx>=0.25.0  # For FastAPI test client
+
+# Monitoring
+evidently>=0.4.0
+
+# Visualization
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# Config & Utilities
+pyyaml>=6.0.0
+tqdm>=4.66.0
+
+# ONNX Export (optional)
+# onnx>=1.15.0
+# onnxruntime>=1.16.0

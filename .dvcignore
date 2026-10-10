@@ -1,0 +1,9 @@
+# DVC Ignore — files/directories DVC should skip
+.venv
+venv
+__pycache__
+.git
+.idea
+.vscode
+*.pyc
+.ipynb_checkpoints

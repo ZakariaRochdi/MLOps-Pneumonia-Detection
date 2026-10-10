@@ -1,0 +1,63 @@
+# ==============================================================================
+# DVC Pipeline Definition
+# Defines the reproducible ML pipeline: prepare → train → evaluate
+# ==============================================================================
+
+stages:
+  prepare_data:
+    cmd: python -m src.data.dataset --prepare
+    deps:
+      - chest_xray
+      - src/data/preprocessing.py
+      - src/data/augmentation.py
+      - src/data/dataset.py
+    params:
+      - data.image_size
+      - data.batch_size
+      - data.val_split
+      - augmentation
+    outs:
+      - data/processed:
+          cache: true
+
+  train:
+    cmd: python -m src.training.train
+    deps:
+      - data/processed
+      - src/models/densenet.py
+      - src/training/train.py
+      - src/training/config.py
+    params:
+      - train
+      - data.batch_size
+      - data.num_workers
+      - data.image_size
+    outs:
+      - models/best_model.pth:
+          cache: true
+    plots:
+      - reports/training_history.csv:
+          x: epoch
+          y: val_f1
+          title: "Validation F1-Score"
+    metrics:
+      - reports/train_metrics.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m src.training.evaluate
+    deps:
+      - models/best_model.pth
+      - data/processed
+      - src/training/evaluate.py
+    params:
+      - validation.f1_threshold
+      - validation.accuracy_threshold
+    metrics:
+      - reports/eval_metrics.json:
+          cache: false
+    plots:
+      - reports/confusion_matrix.png:
+          cache: false
+      - reports/roc_curve.png:
+          cache: false

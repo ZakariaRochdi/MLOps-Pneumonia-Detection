@@ -1,0 +1,49 @@
+# ==============================================================================
+# MLOps Chest X-ray Pneumonia — Central Parameters
+# Referenced by DVC pipeline stages and training scripts
+# ==============================================================================
+
+data:
+  raw_dir: chest_xray
+  processed_dir: data/processed
+  image_size: 224
+  batch_size: 32
+  num_workers: 4
+  val_split: 0.15  # Use 15% of training data as validation (original val set is too small)
+
+train:
+  epochs: 25
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  optimizer: adam
+  scheduler: reduce_on_plateau
+  scheduler_patience: 3
+  scheduler_factor: 0.1
+  early_stopping_patience: 7
+  model_name: densenet121
+  pretrained: true
+  num_classes: 2
+  class_weights: [2.89, 1.0]  # NORMAL weight = 3875/1341 ≈ 2.89, PNEUMONIA weight = 1.0
+  freeze_backbone: false  # Fine-tune all layers
+  seed: 42
+
+augmentation:
+  enabled: true
+  rotation_range: 15
+  horizontal_flip: true
+  vertical_flip: false
+  zoom_range: 0.1
+  brightness: 0.2
+  contrast: 0.2
+  gaussian_blur: true
+  gaussian_blur_kernel: 3
+
+experiment:
+  name: chest-xray-pneumonia
+  mlflow_tracking_uri: http://localhost:5000
+  wandb_project: chest-xray-pneumonia
+  wandb_entity: null  # Set to your W&B username or team
+
+validation:
+  f1_threshold: 0.95
+  accuracy_threshold: 0.90
