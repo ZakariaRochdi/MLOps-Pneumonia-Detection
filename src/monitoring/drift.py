@@ -12,20 +12,18 @@ Monitored signals:
   - Input image quality metrics
 """
 
-import os
 import json
-from datetime import datetime
-from typing import Dict, List, Optional
+import os
 from collections import deque
+from datetime import datetime
 
 import numpy as np
 from PIL import Image
 
 try:
-    from evidently.report import Report
-    from evidently.metric_preset import DataDriftPreset
-    from evidently import ColumnMapping
     import pandas as pd
+    from evidently.metric_preset import DataDriftPreset
+    from evidently.report import Report
 
     EVIDENTLY_AVAILABLE = True
 except ImportError:
@@ -75,7 +73,7 @@ class DataDriftDetector:
                 self.reference_stats = json.load(f)
             print(f"Reference stats loaded from {reference_stats_path}")
 
-    def compute_image_stats(self, image: Image.Image) -> Dict:
+    def compute_image_stats(self, image: Image.Image) -> dict:
         """
         Compute statistical features from an input image.
 
@@ -101,7 +99,7 @@ class DataDriftDetector:
     def log_prediction(
         self,
         image: Image.Image,
-        prediction: Dict,
+        prediction: dict,
     ):
         """
         Log a prediction for drift monitoring.
@@ -115,14 +113,16 @@ class DataDriftDetector:
         self.recent_image_stats.append(stats)
 
         # Store prediction info
-        self.recent_predictions.append({
-            "label": prediction["label"],
-            "timestamp": datetime.now().isoformat(),
-        })
+        self.recent_predictions.append(
+            {
+                "label": prediction["label"],
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         self.recent_confidences.append(prediction["confidence"])
 
-    def check_drift(self) -> Dict:
+    def check_drift(self) -> dict:
         """
         Check for data drift in the recent predictions.
 
@@ -165,14 +165,16 @@ class DataDriftDetector:
         # Image statistics drift (compare recent vs reference)
         if self.reference_stats and len(self.recent_image_stats) > 0:
             recent_means = [s["mean"] for s in self.recent_image_stats]
-            recent_stds = [s["std"] for s in self.recent_image_stats]
+            [s["std"] for s in self.recent_image_stats]
 
             ref_mean = self.reference_stats.get("mean_pixel_mean", 0.5)
             ref_std = self.reference_stats.get("mean_pixel_std", 0.2)
 
             # Simple drift detection: z-test on pixel mean
             current_mean = np.mean(recent_means)
-            z_score = abs(current_mean - ref_mean) / (ref_std / np.sqrt(len(recent_means)))
+            z_score = abs(current_mean - ref_mean) / (
+                ref_std / np.sqrt(len(recent_means))
+            )
 
             result["image_stats_drift"] = {
                 "current_pixel_mean": round(float(current_mean), 4),
@@ -199,7 +201,7 @@ class DataDriftDetector:
 
         return result
 
-    def generate_drift_report(self, save_path: str = None) -> Optional[str]:
+    def generate_drift_report(self, save_path: str | None = None) -> str | None:
         """
         Generate a comprehensive drift report using Evidently AI.
 
@@ -223,9 +225,7 @@ class DataDriftDetector:
             current_data = pd.DataFrame(list(self.recent_image_stats))
 
             # Align columns
-            common_cols = list(
-                set(reference_data.columns) & set(current_data.columns)
-            )
+            common_cols = list(set(reference_data.columns) & set(current_data.columns))
             reference_data = reference_data[common_cols]
             current_data = current_data[common_cols]
 
@@ -276,14 +276,18 @@ class DataDriftDetector:
                 continue
 
             images = [
-                f for f in os.listdir(class_dir)
+                f
+                for f in os.listdir(class_dir)
                 if f.lower().endswith((".jpeg", ".jpg", ".png"))
             ]
             sampled = random.sample(images, min(len(images), max_samples // 2))
 
             for img_name in sampled:
                 img_path = os.path.join(class_dir, img_name)
-                img = np.array(Image.open(img_path).convert("L")).astype(np.float32) / 255.0
+                img = (
+                    np.array(Image.open(img_path).convert("L")).astype(np.float32)
+                    / 255.0
+                )
                 all_means.append(float(np.mean(img)))
                 all_stds.append(float(np.std(img)))
 

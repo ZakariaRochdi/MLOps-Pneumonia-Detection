@@ -8,16 +8,13 @@ Provides:
 """
 
 import io
-import os
-from typing import Dict, List, Union, Optional
 
 import torch
-import numpy as np
 from PIL import Image
 
-from src.data.preprocessing import get_inference_transforms
 from src.data.dataset import CLASS_NAMES
-from src.models.utils import load_model, get_device
+from src.data.preprocessing import get_inference_transforms
+from src.models.utils import get_device, load_model
 
 
 class PneumoniaPredictor:
@@ -42,7 +39,7 @@ class PneumoniaPredictor:
     def __init__(
         self,
         model_path: str = "models/best_model.pth",
-        device: str = None,
+        device: str | None = None,
         image_size: int = 224,
     ):
         self.device = device or get_device()
@@ -56,7 +53,7 @@ class PneumoniaPredictor:
         )
         self.model.eval()
 
-    def predict(self, image: Union[str, Image.Image, bytes]) -> Dict:
+    def predict(self, image: str | Image.Image | bytes) -> dict:
         """
         Predict class for a single chest X-ray image.
 
@@ -88,7 +85,7 @@ class PneumoniaPredictor:
             },
         }
 
-    def predict_batch(self, images: List[Union[str, Image.Image, bytes]]) -> List[Dict]:
+    def predict_batch(self, images: list[str | Image.Image | bytes]) -> list[dict]:
         """
         Predict classes for a batch of images.
 
@@ -111,20 +108,20 @@ class PneumoniaPredictor:
             predicted_idx = p.argmax().item()
             confidence = p[predicted_idx].item()
 
-            results.append({
-                "label": self.class_names[predicted_idx],
-                "confidence": round(confidence, 4),
-                "probabilities": {
-                    name: round(p[j].item(), 4)
-                    for j, name in enumerate(self.class_names)
-                },
-            })
+            results.append(
+                {
+                    "label": self.class_names[predicted_idx],
+                    "confidence": round(confidence, 4),
+                    "probabilities": {
+                        name: round(p[j].item(), 4)
+                        for j, name in enumerate(self.class_names)
+                    },
+                }
+            )
 
         return results
 
-    def predict_with_gradcam(
-        self, image: Union[str, Image.Image, bytes]
-    ) -> Dict:
+    def predict_with_gradcam(self, image: str | Image.Image | bytes) -> dict:
         """
         Predict with GradCAM visualization.
 
@@ -154,7 +151,7 @@ class PneumoniaPredictor:
 
         return result
 
-    def _preprocess(self, image: Union[str, Image.Image, bytes]) -> torch.Tensor:
+    def _preprocess(self, image: str | Image.Image | bytes) -> torch.Tensor:
         """
         Preprocess an image for model input.
 
@@ -172,7 +169,7 @@ class PneumoniaPredictor:
         pil_image = self._to_pil(image)
         return self.transform(pil_image)
 
-    def _to_pil(self, image: Union[str, Image.Image, bytes]) -> Image.Image:
+    def _to_pil(self, image: str | Image.Image | bytes) -> Image.Image:
         """Convert input to PIL Image."""
         if isinstance(image, str):
             pil_image = Image.open(image)

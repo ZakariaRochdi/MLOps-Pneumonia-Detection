@@ -4,7 +4,6 @@ API Schemas — Pydantic models for request/response validation.
 Defines the data contracts for the FastAPI inference API.
 """
 
-from typing import Dict, Optional
 from pydantic import BaseModel, Field
 
 
@@ -23,7 +22,7 @@ class PredictionResponse(BaseModel):
         le=1.0,
         examples=[0.97],
     )
-    probabilities: Dict[str, float] = Field(
+    probabilities: dict[str, float] = Field(
         ...,
         description="Probability for each class",
         examples=[{"NORMAL": 0.03, "PNEUMONIA": 0.97}],
@@ -42,7 +41,7 @@ class HealthResponse(BaseModel):
         ...,
         description="Whether the model is loaded and ready",
     )
-    model_version: Optional[str] = Field(
+    model_version: str | None = Field(
         None,
         description="Version identifier of the loaded model",
     )
@@ -89,7 +88,7 @@ class ErrorResponse(BaseModel):
         ...,
         description="Error message",
     )
-    detail: Optional[str] = Field(
+    detail: str | None = Field(
         None,
         description="Detailed error information",
     )

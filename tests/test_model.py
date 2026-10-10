@@ -12,13 +12,12 @@ Validates:
 
 import os
 import tempfile
+
 import pytest
 import torch
-import numpy as np
 
-from src.models.densenet import DenseNet121Classifier, build_densenet121
-from src.models.utils import save_model, load_model, get_model_info
-
+from src.models.densenet import build_densenet121
+from src.models.utils import get_model_info, load_model, save_model
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -147,9 +146,9 @@ class TestSaveLoad:
             with torch.no_grad():
                 loaded_output = loaded_model(single_input)
 
-        assert torch.allclose(
-            original_output, loaded_output, atol=1e-5
-        ), "Loaded model produces different output"
+        assert torch.allclose(original_output, loaded_output, atol=1e-5), (
+            "Loaded model produces different output"
+        )
 
     def test_save_creates_file(self, model):
         """save_model should create the checkpoint file."""
@@ -167,13 +166,19 @@ class TestBackboneFreeze:
 
     def test_freeze_reduces_trainable_params(self):
         """Freezing backbone should reduce trainable parameters."""
-        model_unfrozen = build_densenet121(num_classes=2, pretrained=False, freeze_backbone=False)
-        model_frozen = build_densenet121(num_classes=2, pretrained=False, freeze_backbone=True)
+        model_unfrozen = build_densenet121(
+            num_classes=2, pretrained=False, freeze_backbone=False
+        )
+        model_frozen = build_densenet121(
+            num_classes=2, pretrained=False, freeze_backbone=True
+        )
 
         unfrozen_count = model_unfrozen.get_num_parameters(trainable_only=True)
         frozen_count = model_frozen.get_num_parameters(trainable_only=True)
 
-        assert frozen_count < unfrozen_count, "Frozen model should have fewer trainable params"
+        assert frozen_count < unfrozen_count, (
+            "Frozen model should have fewer trainable params"
+        )
 
     def test_unfreeze_restores_params(self):
         """Unfreezing should restore all parameters to trainable."""

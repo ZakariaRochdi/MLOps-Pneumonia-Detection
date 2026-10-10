@@ -13,24 +13,23 @@ Implements:
   - Training history CSV export
 """
 
-import os
-import sys
 import json
+import os
 import time
 from datetime import datetime
 
-import torch
-import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
 import numpy as np
 import pandas as pd
+import torch
+from sklearn.metrics import accuracy_score, f1_score
+from torch import nn
+from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
-from sklearn.metrics import f1_score, accuracy_score
 
-from src.training.config import load_config
-from src.models.densenet import build_densenet121
-from src.models.utils import save_model, get_device
 from src.data.dataset import get_dataloaders
+from src.models.densenet import build_densenet121
+from src.models.utils import save_model
+from src.training.config import load_config
 
 
 def train_one_epoch(
@@ -157,15 +156,15 @@ def train(config=None):
         torch.cuda.manual_seed_all(config.train.seed)
 
     device = config.device
-    print(f"\n{'='*60}")
-    print(f"  Training DenseNet121 — Chest X-ray Pneumonia Detection")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("  Training DenseNet121 — Chest X-ray Pneumonia Detection")
+    print(f"{'=' * 60}")
     print(f"  Device:         {device}")
     print(f"  Epochs:         {config.train.epochs}")
     print(f"  Batch size:     {config.data.batch_size}")
     print(f"  Learning rate:  {config.train.learning_rate}")
     print(f"  Class weights:  {config.train.class_weights}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # ── Data ─────────────────────────────────────────────────────────────────
     data_dir = config.data.processed_dir
@@ -224,22 +223,25 @@ def train(config=None):
     if config.experiment.mlflow_enabled:
         try:
             import mlflow
+
             mlflow.set_tracking_uri(config.experiment.mlflow_tracking_uri)
             mlflow.set_experiment(config.experiment.name)
             mlflow_run = mlflow.start_run()
-            mlflow.log_params({
-                "model": config.train.model_name,
-                "epochs": config.train.epochs,
-                "batch_size": config.data.batch_size,
-                "learning_rate": config.train.learning_rate,
-                "weight_decay": config.train.weight_decay,
-                "optimizer": config.train.optimizer,
-                "class_weights": str(config.train.class_weights),
-                "image_size": config.data.image_size,
-                "pretrained": config.train.pretrained,
-                "dropout": config.train.dropout,
-                "freeze_backbone": config.train.freeze_backbone,
-            })
+            mlflow.log_params(
+                {
+                    "model": config.train.model_name,
+                    "epochs": config.train.epochs,
+                    "batch_size": config.data.batch_size,
+                    "learning_rate": config.train.learning_rate,
+                    "weight_decay": config.train.weight_decay,
+                    "optimizer": config.train.optimizer,
+                    "class_weights": str(config.train.class_weights),
+                    "image_size": config.data.image_size,
+                    "pretrained": config.train.pretrained,
+                    "dropout": config.train.dropout,
+                    "freeze_backbone": config.train.freeze_backbone,
+                }
+            )
             print("  MLflow tracking enabled")
         except Exception as e:
             print(f"  MLflow not available: {e}")
@@ -249,6 +251,7 @@ def train(config=None):
     if config.experiment.wandb_enabled:
         try:
             import wandb
+
             wandb_run = wandb.init(
                 project=config.experiment.wandb_project,
                 entity=config.experiment.wandb_entity,
@@ -284,13 +287,21 @@ def train(config=None):
 
         # Train
         train_loss, train_acc, train_f1 = train_one_epoch(
-            model, train_loader, criterion, optimizer, device,
-            scaler=scaler, gradient_clip=config.train.gradient_clip,
+            model,
+            train_loader,
+            criterion,
+            optimizer,
+            device,
+            scaler=scaler,
+            gradient_clip=config.train.gradient_clip,
         )
 
         # Validate
         val_loss, val_acc, val_f1 = validate(
-            model, val_loader, criterion, device,
+            model,
+            val_loader,
+            criterion,
+            device,
         )
 
         # Learning rate scheduling
@@ -300,7 +311,9 @@ def train(config=None):
         epoch_time = time.time() - epoch_start
 
         # Log metrics
-        print(f"  Train  — loss: {train_loss:.4f}  acc: {train_acc:.4f}  f1: {train_f1:.4f}")
+        print(
+            f"  Train  — loss: {train_loss:.4f}  acc: {train_acc:.4f}  f1: {train_f1:.4f}"
+        )
         print(f"  Val    — loss: {val_loss:.4f}  acc: {val_acc:.4f}  f1: {val_f1:.4f}")
         print(f"  LR: {current_lr:.6f}  Time: {epoch_time:.1f}s")
 
@@ -322,15 +335,19 @@ def train(config=None):
         if mlflow_run:
             try:
                 import mlflow
-                mlflow.log_metrics({
-                    "train_loss": train_loss,
-                    "train_acc": train_acc,
-                    "train_f1": train_f1,
-                    "val_loss": val_loss,
-                    "val_acc": val_acc,
-                    "val_f1": val_f1,
-                    "lr": current_lr,
-                }, step=epoch)
+
+                mlflow.log_metrics(
+                    {
+                        "train_loss": train_loss,
+                        "train_acc": train_acc,
+                        "train_f1": train_f1,
+                        "val_loss": val_loss,
+                        "val_acc": val_acc,
+                        "val_f1": val_f1,
+                        "lr": current_lr,
+                    },
+                    step=epoch,
+                )
             except Exception:
                 pass
 
@@ -338,16 +355,19 @@ def train(config=None):
         if wandb_run:
             try:
                 import wandb
-                wandb.log({
-                    "epoch": epoch,
-                    "train/loss": train_loss,
-                    "train/accuracy": train_acc,
-                    "train/f1": train_f1,
-                    "val/loss": val_loss,
-                    "val/accuracy": val_acc,
-                    "val/f1": val_f1,
-                    "lr": current_lr,
-                })
+
+                wandb.log(
+                    {
+                        "epoch": epoch,
+                        "train/loss": train_loss,
+                        "train/accuracy": train_acc,
+                        "train/f1": train_f1,
+                        "val/loss": val_loss,
+                        "val/accuracy": val_acc,
+                        "val/f1": val_f1,
+                        "lr": current_lr,
+                    }
+                )
             except Exception:
                 pass
 
@@ -370,7 +390,9 @@ def train(config=None):
             print(f"  ★ New best model saved (F1: {val_f1:.4f})")
         else:
             patience_counter += 1
-            print(f"  No improvement ({patience_counter}/{config.train.early_stopping_patience})")
+            print(
+                f"  No improvement ({patience_counter}/{config.train.early_stopping_patience})"
+            )
 
         # Early stopping
         if patience_counter >= config.train.early_stopping_patience:
@@ -400,6 +422,7 @@ def train(config=None):
         try:
             import mlflow
             import mlflow.pytorch
+
             mlflow.log_artifact(config.paths.training_history)
             mlflow.log_artifact(config.paths.train_metrics)
             mlflow.log_artifact(config.paths.best_model)
@@ -412,15 +435,16 @@ def train(config=None):
     if wandb_run:
         try:
             import wandb
+
             wandb.save(config.paths.best_model)
             wandb.finish()
             print("  W&B run completed")
         except Exception:
             pass
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Training complete! Best val F1: {best_val_f1:.4f}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     return model, history
 

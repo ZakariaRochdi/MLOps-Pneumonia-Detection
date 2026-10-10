@@ -11,18 +11,17 @@ Features:
 """
 
 import os
-import numpy as np
+
 import matplotlib
+import numpy as np
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+import gradio as gr
+from matplotlib import cm
 from PIL import Image
 
-import gradio as gr
-
-from src.inference.predict import PneumoniaPredictor
 from src.data.dataset import CLASS_NAMES
-
+from src.inference.predict import PneumoniaPredictor
 
 # ── Global predictor ─────────────────────────────────────────────────────────
 MODEL_PATH = os.environ.get("MODEL_PATH", "models/best_model.pth")
@@ -75,7 +74,7 @@ def predict_image(image):
 
     # Format output label
     emoji = "🔴" if label == "PNEUMONIA" else "🟢"
-    label_text = f"{emoji} {label} ({confidence*100:.1f}%)"
+    label_text = f"{emoji} {label} ({confidence * 100:.1f}%)"
 
     # Confidences for Gradio Label component
     confidences = {name: probs[name] for name in CLASS_NAMES}
@@ -133,7 +132,6 @@ def build_interface():
             secondary_hue="gray",
         ),
     ) as demo:
-
         gr.Markdown(
             """
             # 🫁 Chest X-ray Pneumonia Detection

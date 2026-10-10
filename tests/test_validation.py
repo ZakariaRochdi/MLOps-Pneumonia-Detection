@@ -8,12 +8,12 @@ These tests act as the CI gate:
 If these tests fail, the CI pipeline blocks deployment.
 """
 
-import os
 import json
+import os
+
 import pytest
 
 from src.training.config import load_config
-
 
 # ── CI Validation Gate ───────────────────────────────────────────────────────
 
@@ -109,9 +109,7 @@ class TestModelValidationGate:
             "total_samples",
         ]
         for field in required_fields:
-            assert field in eval_metrics, (
-                f"Missing required metric: {field}"
-            )
+            assert field in eval_metrics, f"Missing required metric: {field}"
 
     def test_sufficient_test_samples(self, eval_metrics):
         """Test set should have a meaningful number of samples."""

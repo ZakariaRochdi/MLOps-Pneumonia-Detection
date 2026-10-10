@@ -13,26 +13,23 @@ import io
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Optional
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from PIL import Image
 
 from api.schemas import (
-    PredictionResponse,
+    ErrorResponse,
     HealthResponse,
     ModelInfoResponse,
-    ErrorResponse,
+    PredictionResponse,
 )
-from src.inference.predict import PneumoniaPredictor
-from src.models.utils import get_model_info, get_device
 from src.data.dataset import CLASS_NAMES
-
+from src.inference.predict import PneumoniaPredictor
+from src.models.utils import get_device, get_model_info
 
 # ── Global predictor instance ────────────────────────────────────────────────
-predictor: Optional[PneumoniaPredictor] = None
+predictor: PneumoniaPredictor | None = None
 
 MODEL_PATH = os.environ.get("MODEL_PATH", "models/best_model.pth")
 MODEL_VERSION = os.environ.get("MODEL_VERSION", "1.0.0")
@@ -116,7 +113,7 @@ async def predict(
         # Run inference
         start_time = time.time()
         result = predictor.predict(image)
-        inference_time = time.time() - start_time
+        time.time() - start_time
 
         return PredictionResponse(
             label=result["label"],
@@ -127,7 +124,7 @@ async def predict(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Prediction failed: {str(e)}",
+            detail=f"Prediction failed: {e!s}",
         )
 
 

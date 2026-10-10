@@ -8,7 +8,7 @@ and address class imbalance in the Pneumonia dataset.
 from torchvision import transforms
 
 
-def get_augmentation_transforms(config: dict = None) -> transforms.Compose:
+def get_augmentation_transforms(config: dict | None = None) -> transforms.Compose:
     """
     Build an augmentation pipeline from configuration.
 
@@ -37,9 +37,7 @@ def get_augmentation_transforms(config: dict = None) -> transforms.Compose:
     # Rotation
     rotation_range = config.get("rotation_range", 15)
     if rotation_range > 0:
-        augment_list.append(
-            transforms.RandomRotation(degrees=rotation_range)
-        )
+        augment_list.append(transforms.RandomRotation(degrees=rotation_range))
 
     # Horizontal flip
     if config.get("horizontal_flip", True):
@@ -80,7 +78,7 @@ def get_augmentation_transforms(config: dict = None) -> transforms.Compose:
     return transforms.Compose(augment_list)
 
 
-def get_post_tensor_augmentations(config: dict = None) -> transforms.Compose:
+def get_post_tensor_augmentations(config: dict | None = None) -> transforms.Compose:
     """
     Augmentations that must be applied AFTER ToTensor (operate on tensors).
 
@@ -96,9 +94,7 @@ def get_post_tensor_augmentations(config: dict = None) -> transforms.Compose:
     post_list = []
 
     if config.get("random_erasing", False):
-        post_list.append(
-            transforms.RandomErasing(p=0.3, scale=(0.02, 0.1))
-        )
+        post_list.append(transforms.RandomErasing(p=0.3, scale=(0.02, 0.1)))
 
     if not post_list:
         return transforms.Compose([])  # No-op
@@ -106,7 +102,7 @@ def get_post_tensor_augmentations(config: dict = None) -> transforms.Compose:
     return transforms.Compose(post_list)
 
 
-def build_full_train_pipeline(image_size: int = 224, config: dict = None):
+def build_full_train_pipeline(image_size: int = 224, config: dict | None = None):
     """
     Build the complete training pipeline combining preprocessing + augmentation.
 
@@ -132,9 +128,7 @@ def build_full_train_pipeline(image_size: int = 224, config: dict = None):
 
     # Resize
     pre_tensor.append(transforms.Resize(256))
-    pre_tensor.append(
-        transforms.RandomResizedCrop(image_size, scale=(0.8, 1.0))
-    )
+    pre_tensor.append(transforms.RandomResizedCrop(image_size, scale=(0.8, 1.0)))
 
     # Augmentation transforms
     aug_transforms = get_augmentation_transforms(config)
@@ -142,9 +136,7 @@ def build_full_train_pipeline(image_size: int = 224, config: dict = None):
 
     # To tensor + normalize
     pre_tensor.append(transforms.ToTensor())
-    pre_tensor.append(
-        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
-    )
+    pre_tensor.append(transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD))
 
     # Post-tensor augmentations
     post_tensor = get_post_tensor_augmentations(config)

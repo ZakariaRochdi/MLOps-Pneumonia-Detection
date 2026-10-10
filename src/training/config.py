@@ -7,15 +7,15 @@ Supports loading from both params.yaml (DVC) and configs/training_config.yaml.
 
 import os
 from dataclasses import dataclass, field
-from typing import List, Optional
 
-import yaml
 import torch
+import yaml
 
 
 @dataclass
 class DataConfig:
     """Data loading configuration."""
+
     raw_dir: str = "chest_xray"
     processed_dir: str = "data/processed"
     image_size: int = 224
@@ -28,6 +28,7 @@ class DataConfig:
 @dataclass
 class TrainConfig:
     """Training hyperparameters."""
+
     epochs: int = 25
     learning_rate: float = 0.0001
     weight_decay: float = 0.0001
@@ -39,7 +40,7 @@ class TrainConfig:
     model_name: str = "densenet121"
     pretrained: bool = True
     num_classes: int = 2
-    class_weights: List[float] = field(default_factory=lambda: [2.89, 1.0])
+    class_weights: list[float] = field(default_factory=lambda: [2.89, 1.0])
     freeze_backbone: bool = False
     dropout: float = 0.3
     gradient_clip: float = 1.0
@@ -50,6 +51,7 @@ class TrainConfig:
 @dataclass
 class AugmentationConfig:
     """Data augmentation parameters."""
+
     enabled: bool = True
     rotation_range: int = 15
     horizontal_flip: bool = True
@@ -65,17 +67,19 @@ class AugmentationConfig:
 @dataclass
 class ExperimentConfig:
     """Experiment tracking configuration."""
+
     name: str = "chest-xray-pneumonia"
     mlflow_tracking_uri: str = "http://localhost:5000"
     mlflow_enabled: bool = True
     wandb_project: str = "chest-xray-pneumonia"
-    wandb_entity: Optional[str] = None
+    wandb_entity: str | None = None
     wandb_enabled: bool = False
 
 
 @dataclass
 class ValidationConfig:
     """Model validation gate thresholds."""
+
     f1_threshold: float = 0.95
     accuracy_threshold: float = 0.90
 
@@ -83,6 +87,7 @@ class ValidationConfig:
 @dataclass
 class PathsConfig:
     """File paths for artifacts."""
+
     model_dir: str = "models"
     reports_dir: str = "reports"
     best_model: str = "models/best_model.pth"
@@ -96,6 +101,7 @@ class PathsConfig:
 @dataclass
 class Config:
     """Master configuration combining all sub-configs."""
+
     data: DataConfig = field(default_factory=DataConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
     augmentation: AugmentationConfig = field(default_factory=AugmentationConfig)

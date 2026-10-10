@@ -11,24 +11,22 @@ Validates:
 """
 
 import os
+
+import numpy as np
 import pytest
 import torch
-import numpy as np
 from PIL import Image
 
+from src.data.augmentation import (
+    build_full_train_pipeline,
+    get_augmentation_transforms,
+)
+from src.data.dataset import CLASS_NAMES, CLASS_TO_IDX
 from src.data.preprocessing import (
+    get_inference_transforms,
     get_train_transforms,
     get_val_transforms,
-    get_inference_transforms,
-    IMAGENET_MEAN,
-    IMAGENET_STD,
 )
-from src.data.augmentation import (
-    get_augmentation_transforms,
-    build_full_train_pipeline,
-)
-from src.data.dataset import CLASS_TO_IDX, CLASS_NAMES
-
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -36,9 +34,7 @@ from src.data.dataset import CLASS_TO_IDX, CLASS_NAMES
 @pytest.fixture
 def sample_rgb_image():
     """Create a sample 512x512 RGB image."""
-    return Image.fromarray(
-        np.random.randint(0, 256, (512, 512, 3), dtype=np.uint8)
-    )
+    return Image.fromarray(np.random.randint(0, 256, (512, 512, 3), dtype=np.uint8))
 
 
 @pytest.fixture
@@ -52,9 +48,7 @@ def sample_grayscale_image():
 @pytest.fixture
 def sample_small_image():
     """Create a small 64x64 RGB image (smaller than target 224)."""
-    return Image.fromarray(
-        np.random.randint(0, 256, (64, 64, 3), dtype=np.uint8)
-    )
+    return Image.fromarray(np.random.randint(0, 256, (64, 64, 3), dtype=np.uint8))
 
 
 # ── Resize Tests ─────────────────────────────────────────────────────────────
@@ -67,13 +61,17 @@ class TestImageResize:
         """Training transforms should produce 224×224 output."""
         transform = get_train_transforms(image_size=224)
         output = transform(sample_rgb_image)
-        assert output.shape == (3, 224, 224), f"Expected (3, 224, 224), got {output.shape}"
+        assert output.shape == (3, 224, 224), (
+            f"Expected (3, 224, 224), got {output.shape}"
+        )
 
     def test_val_transform_output_size(self, sample_rgb_image):
         """Validation transforms should produce 224×224 output."""
         transform = get_val_transforms(image_size=224)
         output = transform(sample_rgb_image)
-        assert output.shape == (3, 224, 224), f"Expected (3, 224, 224), got {output.shape}"
+        assert output.shape == (3, 224, 224), (
+            f"Expected (3, 224, 224), got {output.shape}"
+        )
 
     def test_inference_transform_output_size(self, sample_rgb_image):
         """Inference transforms should produce 224×224 output."""
@@ -159,7 +157,7 @@ class TestAugmentation:
         transform = get_train_transforms(image_size=224)
         outputs = [transform(sample_rgb_image) for _ in range(5)]
         # At least some outputs should differ (probabilistic augmentation)
-        unique_sums = len(set(o.sum().item() for o in outputs))
+        unique_sums = len({o.sum().item() for o in outputs})
         assert unique_sums >= 2, "Augmentation should produce variation"
 
     def test_augmentation_default_config(self, sample_rgb_image):

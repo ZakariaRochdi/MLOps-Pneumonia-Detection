@@ -9,7 +9,7 @@ Architecture (from diagram):
 """
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torchvision import models
 from torchvision.models import DenseNet121_Weights
 
@@ -98,7 +98,7 @@ class DenseNet121Classifier(nn.Module):
             if "classifier" not in name:
                 param.requires_grad = False
 
-    def unfreeze_backbone(self, num_layers: int = None):
+    def unfreeze_backbone(self, num_layers: int | None = None):
         """
         Unfreeze backbone layers for fine-tuning.
 
@@ -115,9 +115,10 @@ class DenseNet121Classifier(nn.Module):
             blocks_to_unfreeze = dense_blocks[-num_layers:]
 
             for name, param in self.backbone.named_parameters():
-                if any(block in name for block in blocks_to_unfreeze):
-                    param.requires_grad = True
-                elif "classifier" in name:
+                if (
+                    any(block in name for block in blocks_to_unfreeze)
+                    or "classifier" in name
+                ):
                     param.requires_grad = True
 
     def register_gradcam_hooks(self):
@@ -137,7 +138,9 @@ class DenseNet121Classifier(nn.Module):
         target_layer.register_forward_hook(forward_hook)
         target_layer.register_full_backward_hook(backward_hook)
 
-    def get_gradcam(self, x: torch.Tensor, target_class: int = None) -> torch.Tensor:
+    def get_gradcam(
+        self, x: torch.Tensor, target_class: int | None = None
+    ) -> torch.Tensor:
         """
         Generate GradCAM heatmap for the input image.
 
@@ -228,7 +231,7 @@ def build_densenet121(
 
     total_params = model.get_num_parameters()
     trainable_params = model.get_num_parameters(trainable_only=True)
-    print(f"DenseNet121 built:")
+    print("DenseNet121 built:")
     print(f"  Total parameters:     {total_params:,}")
     print(f"  Trainable parameters: {trainable_params:,}")
 

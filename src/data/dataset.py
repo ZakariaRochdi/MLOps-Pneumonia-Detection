@@ -10,20 +10,16 @@ Handles:
 """
 
 import os
-import sys
 import shutil
-import random
+import sys
 from pathlib import Path
-from typing import Tuple, Optional, Dict
 
-import yaml
 import torch
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
-from torchvision.datasets import ImageFolder
+import yaml
 from PIL import Image
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
 from src.data.preprocessing import get_train_transforms, get_val_transforms
-
 
 # Class label mapping
 CLASS_NAMES = ["NORMAL", "PNEUMONIA"]
@@ -79,7 +75,7 @@ class ChestXrayDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         img_path, label = self.samples[idx]
 
         # Load image and convert to RGB (chest X-rays may be grayscale)
@@ -93,7 +89,7 @@ class ChestXrayDataset(Dataset):
 
         return image, label
 
-    def get_class_distribution(self) -> Dict[str, int]:
+    def get_class_distribution(self) -> dict[str, int]:
         """Return count of samples per class."""
         dist = {name: 0 for name in CLASS_NAMES}
         for _, label in self.samples:
@@ -138,7 +134,7 @@ def get_dataloaders(
     val_split: float = 0.15,
     use_weighted_sampler: bool = True,
     pin_memory: bool = True,
-) -> Tuple[DataLoader, DataLoader, DataLoader]:
+) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Factory function to create train/val/test DataLoaders.
 

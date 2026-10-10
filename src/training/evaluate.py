@@ -9,39 +9,38 @@ Computes:
   - Outputs metrics as JSON for DVC tracking
 """
 
+import json
 import os
 import sys
-import json
-from typing import Dict, Tuple
 
-import torch
-import numpy as np
 import matplotlib
+import numpy as np
+import torch
+
 matplotlib.use("Agg")  # Non-interactive backend for CI/CD
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import (
     accuracy_score,
+    auc,
+    classification_report,
+    confusion_matrix,
     f1_score,
     precision_score,
     recall_score,
-    classification_report,
-    confusion_matrix,
     roc_curve,
-    auc,
 )
 from tqdm import tqdm
 
-from src.training.config import load_config
-from src.models.densenet import build_densenet121
+from src.data.dataset import CLASS_NAMES, get_dataloaders
 from src.models.utils import load_model
-from src.data.dataset import get_dataloaders, CLASS_NAMES
+from src.training.config import load_config
 
 
 @torch.no_grad()
 def evaluate_model(
     model, dataloader, device: str
-) -> Tuple[Dict, np.ndarray, np.ndarray]:
+) -> tuple[dict, np.ndarray, np.ndarray]:
     """
     Evaluate model on a dataset.
 
@@ -97,7 +96,7 @@ def evaluate_model(
             CLASS_NAMES[i]: float(v)
             for i, v in enumerate(recall_score(all_labels, all_preds, average=None))
         },
-        "total_samples": int(len(all_labels)),
+        "total_samples": len(all_labels),
         "class_distribution": {
             CLASS_NAMES[i]: int(np.sum(all_labels == i))
             for i in range(len(CLASS_NAMES))
@@ -111,7 +110,7 @@ def plot_confusion_matrix(
     labels: np.ndarray,
     probs: np.ndarray,
     save_path: str,
-    class_names: list = None,
+    class_names: list | None = None,
 ):
     """
     Plot and save a confusion matrix heatmap.
@@ -168,13 +167,15 @@ def plot_roc_curve(
 
     plt.figure(figsize=(8, 6))
     plt.plot(
-        fpr, tpr,
+        fpr,
+        tpr,
         color="#1e88e5",
         linewidth=2,
         label=f"ROC Curve (AUC = {roc_auc:.4f})",
     )
     plt.plot(
-        [0, 1], [0, 1],
+        [0, 1],
+        [0, 1],
         color="gray",
         linestyle="--",
         linewidth=1,
@@ -214,9 +215,9 @@ def run_evaluation(config=None):
 
     device = config.device
 
-    print(f"\n{'='*60}")
-    print(f"  Evaluating DenseNet121 — Chest X-ray Pneumonia Detection")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("  Evaluating DenseNet121 — Chest X-ray Pneumonia Detection")
+    print(f"{'=' * 60}")
 
     # Load model
     model_path = config.paths.best_model
@@ -244,29 +245,25 @@ def run_evaluation(config=None):
 
     # Print results
     print(f"\n  Results on Test Set ({metrics['total_samples']} samples)")
-    print(f"  {'─'*40}")
+    print(f"  {'─' * 40}")
     print(f"  Accuracy:          {metrics['accuracy']:.4f}")
     print(f"  F1 (weighted):     {metrics['f1_weighted']:.4f}")
     print(f"  F1 (macro):        {metrics['f1_macro']:.4f}")
     print(f"  Precision:         {metrics['precision_weighted']:.4f}")
     print(f"  Recall:            {metrics['recall_weighted']:.4f}")
-    print(f"\n  Per-class F1:")
+    print("\n  Per-class F1:")
     for cls_name, f1_val in metrics["f1_per_class"].items():
         print(f"    {cls_name}: {f1_val:.4f}")
 
     # Classification report
     preds = np.argmax(all_probs, axis=1)
-    print(f"\n  Classification Report:")
+    print("\n  Classification Report:")
     print(classification_report(all_labels, preds, target_names=CLASS_NAMES))
 
     # Generate plots
-    plot_confusion_matrix(
-        all_labels, all_probs, config.paths.confusion_matrix
-    )
+    plot_confusion_matrix(all_labels, all_probs, config.paths.confusion_matrix)
 
-    roc_auc = plot_roc_curve(
-        all_labels, all_probs, config.paths.roc_curve
-    )
+    roc_auc = plot_roc_curve(all_labels, all_probs, config.paths.roc_curve)
     metrics["roc_auc"] = float(roc_auc)
 
     # Save metrics JSON for DVC
@@ -276,13 +273,17 @@ def run_evaluation(config=None):
     print(f"\nEvaluation metrics saved to {config.paths.eval_metrics}")
 
     # Validation gates
-    print(f"\n  Validation Gates:")
+    print("\n  Validation Gates:")
     f1_pass = metrics["f1_weighted"] >= config.validation.f1_threshold
     acc_pass = metrics["accuracy"] >= config.validation.accuracy_threshold
-    print(f"  F1 ≥ {config.validation.f1_threshold}:       {'✓ PASS' if f1_pass else '✗ FAIL'} ({metrics['f1_weighted']:.4f})")
-    print(f"  Accuracy ≥ {config.validation.accuracy_threshold}:  {'✓ PASS' if acc_pass else '✗ FAIL'} ({metrics['accuracy']:.4f})")
+    print(
+        f"  F1 ≥ {config.validation.f1_threshold}:       {'✓ PASS' if f1_pass else '✗ FAIL'} ({metrics['f1_weighted']:.4f})"
+    )
+    print(
+        f"  Accuracy ≥ {config.validation.accuracy_threshold}:  {'✓ PASS' if acc_pass else '✗ FAIL'} ({metrics['accuracy']:.4f})"
+    )
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
 
     return metrics
 

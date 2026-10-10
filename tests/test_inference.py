@@ -10,12 +10,11 @@ Validates:
 
 import io
 import os
-import pytest
+
 import numpy as np
-from PIL import Image
-
+import pytest
 from fastapi.testclient import TestClient
-
+from PIL import Image
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -34,9 +33,7 @@ def client():
 @pytest.fixture
 def sample_jpeg_bytes():
     """Create a sample JPEG image as bytes."""
-    img = Image.fromarray(
-        np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8)
-    )
+    img = Image.fromarray(np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8))
     buffer = io.BytesIO()
     img.save(buffer, format="JPEG")
     buffer.seek(0)
@@ -46,9 +43,7 @@ def sample_jpeg_bytes():
 @pytest.fixture
 def sample_png_bytes():
     """Create a sample PNG image as bytes."""
-    img = Image.fromarray(
-        np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8)
-    )
+    img = Image.fromarray(np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8))
     buffer = io.BytesIO()
     img.save(buffer, format="PNG")
     buffer.seek(0)

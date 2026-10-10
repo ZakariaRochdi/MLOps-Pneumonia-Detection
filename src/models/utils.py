@@ -8,12 +8,10 @@ Provides standardized model persistence for:
 """
 
 import os
-import json
 from datetime import datetime
-from typing import Dict, Optional
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from src.models.densenet import DenseNet121Classifier, build_densenet121
 
@@ -22,9 +20,9 @@ def save_model(
     model: nn.Module,
     path: str,
     optimizer=None,
-    epoch: int = None,
-    metrics: Dict = None,
-    config: Dict = None,
+    epoch: int | None = None,
+    metrics: dict | None = None,
+    config: dict | None = None,
 ):
     """
     Save model checkpoint with metadata.
@@ -68,7 +66,7 @@ def save_model(
 def load_model(
     path: str,
     num_classes: int = 2,
-    device: str = None,
+    device: str | None = None,
     load_weights_only: bool = True,
 ) -> DenseNet121Classifier:
     """
@@ -116,7 +114,7 @@ def export_to_onnx(
     model: nn.Module,
     path: str,
     input_size: tuple = (1, 3, 224, 224),
-    device: str = None,
+    device: str | None = None,
 ):
     """
     Export model to ONNX format for production serving.
@@ -166,7 +164,7 @@ def get_device() -> str:
     return device
 
 
-def get_model_info(model: nn.Module) -> Dict:
+def get_model_info(model: nn.Module) -> dict:
     """
     Extract model information.
 
