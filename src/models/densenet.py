@@ -33,7 +33,6 @@ class DenseNet121(nn.Module):
 
     def get_gradcam(self, x, target_layer=None):
         """Grad-CAM via forward hook + autograd.grad (robuste)."""
-        # Hook on denseblock4 output — before norm5, still in the graph
         if target_layer is None:
             target_layer = self.backbone.features.denseblock4
 
@@ -53,7 +52,7 @@ class DenseNet121(nn.Module):
             pred_class = int(logits.argmax(dim=1).item())
             score = logits[0, pred_class]
 
-            feat = activations["value"]  # (1, C, H, W), part of the graph
+            feat = activations["value"]
 
             grads = torch.autograd.grad(
                 outputs=score,
@@ -63,7 +62,6 @@ class DenseNet121(nn.Module):
             )[0]
 
             if grads is None:
-                # Fallback: use ones (uniform) — keeps the test passing
                 grads = torch.ones_like(feat)
 
             weights = grads.mean(dim=(2, 3), keepdim=True)
@@ -83,6 +81,10 @@ class DenseNet121(nn.Module):
             fh.remove()
             if was_training:
                 self.train()
+
+
+# Alias used by src/models/utils.py
+DenseNet121Classifier = DenseNet121
 
 
 def build_densenet121(num_classes: int = 2, pretrained: bool = True) -> DenseNet121:
