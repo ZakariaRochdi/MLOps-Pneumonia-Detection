@@ -9,10 +9,14 @@ Computes:
   - Outputs metrics as JSON for DVC tracking
 """
 
-from src.training.config import load_config
-from src.models.utils import load_model
-from src.data.dataset import CLASS_NAMES, get_dataloaders
-from tqdm import tqdm
+import json
+import os
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+import torch
 from sklearn.metrics import (
     accuracy_score,
     auc,
@@ -23,110 +27,110 @@ from sklearn.metrics import (
     recall_score,
     roc_curve,
 )
-import seaborn as sns
-import matplotlib.pyplot as plt
-import json
-import os
-import sys
+from tqdm import tqdm
 
-import matplotlib
-import numpy as np
-import torch
+from src.data.dataset import CLASS_NAMES, get_dataloaders
+from src.models.utils import load_model
+from src.training.config import load_config
 
-matplotlib.use("Agg")  # Non-interactive backend for CI/CD
+# Backend non-interactif (CI-safe) — doit être APRÈS tous les imports
+matplotlib.use("Agg")
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _get_device() -> torch.device:
+    """Return CUDA device if available, otherwise CPU."""
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def _ensure_dir(path: str) -> None:
+    """Create directory if it does not exist."""
+    os.makedirs(path, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Inference
+# ---------------------------------------------------------------------------
 
 @torch.no_grad()
-def evaluate_model(
-    model, dataloader, device: str
-) -> tuple[dict, np.ndarray, np.ndarray]:
+def run_inference(model, dataloader, device):
     """
-    Evaluate model on a dataset.
-
-    Args:
-        model: PyTorch model in eval mode.
-        dataloader: DataLoader to evaluate on.
-        device: Device string.
+    Run inference over the dataloader.
 
     Returns:
-        Tuple of (metrics_dict, all_labels, all_probs).
+        all_labels (np.ndarray): ground-truth labels
+        all_preds  (np.ndarray): predicted class indices
+        all_probs  (np.ndarray): softmax probabilities (N, num_classes)
     """
     model.eval()
-    all_preds = []
+    model.to(device)
+
     all_labels = []
+    all_preds = []
     all_probs = []
 
-    for images, labels in tqdm(dataloader, desc="Evaluating", leave=False):
+    for images, labels in tqdm(dataloader, desc="Evaluating"):
         images = images.to(device)
         labels = labels.to(device)
 
         outputs = model(images)
         probs = torch.softmax(outputs, dim=1)
-        _, preds = torch.max(outputs, 1)
+        preds = torch.argmax(probs, dim=1)
 
-        all_preds.extend(preds.cpu().numpy())
-        all_labels.extend(labels.cpu().numpy())
-        all_probs.extend(probs.cpu().numpy())
+        all_labels.append(labels.cpu().numpy())
+        all_preds.append(preds.cpu().numpy())
+        all_probs.append(probs.cpu().numpy())
 
-    all_preds = np.array(all_preds)
-    all_labels = np.array(all_labels)
-    all_probs = np.array(all_probs)
+    all_labels = np.concatenate(all_labels, axis=0)
+    all_preds = np.concatenate(all_preds, axis=0)
+    all_probs = np.concatenate(all_probs, axis=0)
 
-    # Compute metrics
+    return all_labels, all_preds, all_probs
+
+
+# ---------------------------------------------------------------------------
+# Metrics
+# ---------------------------------------------------------------------------
+
+def compute_metrics(labels, preds):
+    """Compute accuracy, F1 (weighted), precision, recall."""
     metrics = {
-        "accuracy": float(accuracy_score(all_labels, all_preds)),
-        "f1_weighted": float(f1_score(all_labels, all_preds, average="weighted")),
-        "f1_macro": float(f1_score(all_labels, all_preds, average="macro")),
-        "f1_per_class": {
-            CLASS_NAMES[i]: float(v)
-            for i, v in enumerate(f1_score(all_labels, all_preds, average=None))
-        },
+        "accuracy": float(accuracy_score(labels, preds)),
+        "f1_weighted": float(f1_score(labels, preds, average="weighted")),
         "precision_weighted": float(
-            precision_score(all_labels, all_preds, average="weighted")
+            precision_score(labels, preds, average="weighted", zero_division=0)
         ),
         "recall_weighted": float(
-            recall_score(all_labels, all_preds, average="weighted")
+            recall_score(labels, preds, average="weighted", zero_division=0)
         ),
-        "precision_per_class": {
-            CLASS_NAMES[i]: float(v)
-            for i, v in enumerate(precision_score(all_labels, all_preds, average=None))
-        },
-        "recall_per_class": {
-            CLASS_NAMES[i]: float(v)
-            for i, v in enumerate(recall_score(all_labels, all_preds, average=None))
-        },
-        "total_samples": len(all_labels),
-        "class_distribution": {
-            CLASS_NAMES[i]: int(np.sum(all_labels == i))
-            for i in range(len(CLASS_NAMES))
-        },
     }
+    return metrics
 
-    return metrics, all_labels, all_probs
+
+def per_class_metrics(labels, preds, class_names):
+    """Compute per-class F1, precision, recall."""
+    report = classification_report(
+        labels,
+        preds,
+        target_names=class_names,
+        output_dict=True,
+        zero_division=0,
+    )
+    return report
 
 
-def plot_confusion_matrix(
-    labels: np.ndarray,
-    probs: np.ndarray,
-    save_path: str,
-    class_names: list | None = None,
-):
-    """
-    Plot and save a confusion matrix heatmap.
+# ---------------------------------------------------------------------------
+# Plots
+# ---------------------------------------------------------------------------
 
-    Args:
-        labels: Ground truth labels.
-        probs: Predicted probabilities.
-        save_path: Path to save the plot.
-        class_names: List of class names.
-    """
-    if class_names is None:
-        class_names = CLASS_NAMES
-
-    preds = np.argmax(probs, axis=1)
+def plot_confusion_matrix(labels, preds, class_names, output_path):
+    """Save a seaborn heatmap of the confusion matrix."""
     cm = confusion_matrix(labels, preds)
 
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(10, 8))
     sns.heatmap(
         cm,
         annot=True,
@@ -134,164 +138,97 @@ def plot_confusion_matrix(
         cmap="Blues",
         xticklabels=class_names,
         yticklabels=class_names,
-        cbar_kws={"label": "Count"},
     )
-    plt.title("Confusion Matrix — DenseNet121", fontsize=14, fontweight="bold")
-    plt.xlabel("Predicted Label", fontsize=12)
-    plt.ylabel("True Label", fontsize=12)
+    plt.title("Confusion Matrix")
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
     plt.tight_layout()
-
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"Confusion matrix saved to {save_path}")
 
 
-def plot_roc_curve(
-    labels: np.ndarray,
-    probs: np.ndarray,
-    save_path: str,
-):
-    """
-    Plot and save ROC curve with AUC.
+def plot_roc_curve(labels, probs, class_names, output_path):
+    """Save a one-vs-rest ROC curve plot with AUC values."""
+    num_classes = probs.shape[1]
 
-    Args:
-        labels: Ground truth labels.
-        probs: Predicted probabilities (shape: [N, num_classes]).
-        save_path: Path to save the plot.
-    """
-    # Binary ROC: use probability of PNEUMONIA class
-    fpr, tpr, _ = roc_curve(labels, probs[:, 1])
-    roc_auc = auc(fpr, tpr)
+    plt.figure(figsize=(10, 8))
 
-    plt.figure(figsize=(8, 6))
-    plt.plot(
-        fpr,
-        tpr,
-        color="#1e88e5",
-        linewidth=2,
-        label=f"ROC Curve (AUC = {roc_auc:.4f})",
-    )
-    plt.plot(
-        [0, 1],
-        [0, 1],
-        color="gray",
-        linestyle="--",
-        linewidth=1,
-        label="Random Baseline",
-    )
-    plt.fill_between(fpr, tpr, alpha=0.1, color="#1e88e5")
-    plt.xlabel("False Positive Rate", fontsize=12)
-    plt.ylabel("True Positive Rate", fontsize=12)
-    plt.title("ROC Curve — DenseNet121", fontsize=14, fontweight="bold")
-    plt.legend(loc="lower right", fontsize=11)
-    plt.grid(True, alpha=0.3)
+    for i in range(num_classes):
+        binary_labels = (labels == i).astype(int)
+        fpr, tpr, _ = roc_curve(binary_labels, probs[:, i])
+        roc_auc = auc(fpr, tpr)
+        plt.plot(fpr, tpr, label=f"{class_names[i]} (AUC = {roc_auc:.3f})")
+
+    plt.plot([0, 1], [0, 1], "k--", linewidth=1)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curve (One-vs-Rest)")
+    plt.legend(loc="lower right")
     plt.tight_layout()
-
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.savefig(output_path, dpi=150)
     plt.close()
-    print(f"ROC curve saved to {save_path}")
-
-    return roc_auc
 
 
-def run_evaluation(config=None):
-    """
-    Full evaluation pipeline.
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
-    1. Load config
-    2. Load best model
-    3. Evaluate on test set
-    4. Generate confusion matrix & ROC curve plots
-    5. Save metrics JSON for DVC
+def main():
+    config = load_config()
+    device = _get_device()
 
-    Args:
-        config: Config object. If None, loaded from YAML files.
-    """
-    if config is None:
-        config = load_config()
+    # Output directories
+    reports_dir = "reports"
+    figures_dir = os.path.join(reports_dir, "figures")
+    _ensure_dir(reports_dir)
+    _ensure_dir(figures_dir)
 
-    device = config.device
+    # Data
+    _, _, test_loader = get_dataloaders(config)
 
-    print(f"\n{'=' * 60}")
-    print("  Evaluating DenseNet121 — Chest X-ray Pneumonia Detection")
-    print(f"{'=' * 60}")
+    # Model
+    model_path = config.get("model_path", "models/best_model.pth")
+    model = load_model(model_path, device=device)
 
-    # Load model
-    model_path = config.paths.best_model
-    if not os.path.exists(model_path):
-        print(f"ERROR: Model not found at {model_path}")
-        print("  Run training first: python -m src.training.train")
-        sys.exit(1)
+    # Inference
+    labels, preds, probs = run_inference(model, test_loader, device)
 
-    model = load_model(model_path, num_classes=config.train.num_classes, device=device)
+    # Metrics
+    metrics = compute_metrics(labels, preds)
+    report = per_class_metrics(labels, preds, CLASS_NAMES)
 
-    # Load test data
-    data_dir = config.data.processed_dir
-    if not os.path.exists(data_dir):
-        data_dir = config.data.raw_dir
-
-    _, _, test_loader = get_dataloaders(
-        data_dir=data_dir,
-        batch_size=config.data.batch_size,
-        num_workers=config.data.num_workers,
-        image_size=config.data.image_size,
-    )
-
-    # Evaluate
-    metrics, all_labels, all_probs = evaluate_model(model, test_loader, device)
-
-    # Print results
-    print(f"\n  Results on Test Set ({metrics['total_samples']} samples)")
-    print(f"  {'─' * 40}")
-    print(f"  Accuracy:          {metrics['accuracy']:.4f}")
-    print(f"  F1 (weighted):     {metrics['f1_weighted']:.4f}")
-    print(f"  F1 (macro):        {metrics['f1_macro']:.4f}")
-    print(f"  Precision:         {metrics['precision_weighted']:.4f}")
-    print(f"  Recall:            {metrics['recall_weighted']:.4f}")
-    print("\n  Per-class F1:")
-    for cls_name, f1_val in metrics["f1_per_class"].items():
-        print(f"    {cls_name}: {f1_val:.4f}")
-
-    # Classification report
-    preds = np.argmax(all_probs, axis=1)
-    print("\n  Classification Report:")
-    print(classification_report(all_labels, preds, target_names=CLASS_NAMES))
-
-    # Generate plots
-    plot_confusion_matrix(all_labels, all_probs, config.paths.confusion_matrix)
-
-    roc_auc = plot_roc_curve(all_labels, all_probs, config.paths.roc_curve)
-    metrics["roc_auc"] = float(roc_auc)
-
-    # Save metrics JSON for DVC
-    os.makedirs(os.path.dirname(config.paths.eval_metrics), exist_ok=True)
-    with open(config.paths.eval_metrics, "w") as f:
+    # Save JSON metrics
+    metrics_path = os.path.join(reports_dir, "metrics.json")
+    with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
-    print(f"\nEvaluation metrics saved to {config.paths.eval_metrics}")
 
-    # Validation gates
-    print("\n  Validation Gates:")
-    f1_pass = metrics["f1_weighted"] >= config.validation.f1_threshold
-    acc_pass = metrics["accuracy"] >= config.validation.accuracy_threshold
-    print(
-        f"  F1 ≥ {
-            config.validation.f1_threshold}:       {
-            '✓ PASS' if f1_pass else '✗ FAIL'} ({
-            metrics['f1_weighted']:.4f})"
+    report_path = os.path.join(reports_dir, "classification_report.json")
+    with open(report_path, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2)
+
+    # Plots
+    plot_confusion_matrix(
+        labels, preds, CLASS_NAMES,
+        os.path.join(figures_dir, "confusion_matrix.png"),
     )
-    print(
-        f"  Accuracy ≥ {
-            config.validation.accuracy_threshold}:  {
-            '✓ PASS' if acc_pass else '✗ FAIL'} ({
-            metrics['accuracy']:.4f})"
+    plot_roc_curve(
+        labels, probs, CLASS_NAMES,
+        os.path.join(figures_dir, "roc_curve.png"),
     )
 
-    print(f"\n{'=' * 60}")
-
-    return metrics
+    # Console summary
+    print("=" * 60)
+    print("Evaluation Results")
+    print("=" * 60)
+    for key, value in metrics.items():
+        print(f"{key:>22}: {value:.4f}")
+    print("=" * 60)
+    print(f"Metrics saved to   : {metrics_path}")
+    print(f"Report saved to    : {report_path}")
+    print(f"Figures saved to   : {figures_dir}")
 
 
 if __name__ == "__main__":
-    run_evaluation()
+    main()
