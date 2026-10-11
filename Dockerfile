@@ -27,8 +27,9 @@ FROM python:3.10-slim AS runtime
 WORKDIR /app
 
 # Install runtime system dependencies (OpenCV, image processing)
+# NOTE: libgl1-mesa-glx was renamed to libgl1 in Debian Trixie
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     curl \
     && rm -rf /var/lib/apt/lists/*
@@ -41,7 +42,6 @@ COPY src/ ./src/
 COPY api/ ./api/
 
 # Create configs/ and models/ dirs first, then copy their content if present
-# (avoids build failure when folders are empty or missing)
 RUN mkdir -p /app/configs /app/models
 
 COPY configs/ ./configs/
