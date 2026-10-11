@@ -39,11 +39,16 @@ COPY --from=builder /install /usr/local
 # Copy application source code
 COPY src/ ./src/
 COPY api/ ./api/
-COPY configs/ ./configs/
-COPY params.yaml .
 
-# Copy trained model
+# Create configs/ and models/ dirs first, then copy their content if present
+# (avoids build failure when folders are empty or missing)
+RUN mkdir -p /app/configs /app/models
+
+COPY configs/ ./configs/
 COPY models/ ./models/
+
+# params.yaml is optional too
+COPY params.yaml* ./
 
 # Environment variables
 ENV MODEL_PATH=models/best_model.pth
